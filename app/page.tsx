@@ -122,7 +122,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Busan Game 🇰🇷</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Profi Annual Planning 2026🇰🇷</h1>
             <p className="text-gray-600 mt-2">Team Login</p>
           </div>
           
@@ -190,7 +190,7 @@ export default function Home() {
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Busan Game 🇰🇷</h1>
+            <h1 className="text-xl font-bold text-gray-900">Profi Annual Planning 2026🇰🇷</h1>
             <button 
               onClick={handleNameChange}
               className="text-2xl font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-2"

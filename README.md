@@ -1,4 +1,4 @@
-# Busan Game 🇰🇷
+# Profi Annual Planning 2026🇰🇷
 
 A simple web-based game for 10 teams exploring Busan. Teams complete tasks, check them off, and upload photo proof.
 

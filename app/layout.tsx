@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Busan Game",
+  title: "Profi Annual Planning 2026🇰🇷",
   description: "Team game for Busan trip",
 };
 
