@@ -5,15 +5,25 @@ import { Team, INITIAL_TASKS } from './definitions';
 
 const DB_PATH = path.join(process.cwd(), 'db.json');
 
-// Check if Vercel KV is configured
-const isKVConfigured = !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN;
+// Debug: Log all environment variable keys (not values) to see what's available
+console.log('Available Env Vars:', Object.keys(process.env).filter(key => key.startsWith('KV_') || key.startsWith('BLOB_')));
 
-console.log('KV Configured:', isKVConfigured); // Debug log
+// Check if Vercel KV is configured
+// Vercel sometimes uses KV_URL or KV_REST_API_URL depending on the integration
+const kvUrl = process.env.KV_REST_API_URL || process.env.KV_URL;
+const kvToken = process.env.KV_REST_API_TOKEN || process.env.KV_TOKEN;
+
+const isKVConfigured = !!kvUrl && !!kvToken;
+
+console.log('KV Configured:', isKVConfigured); 
+if (!isKVConfigured) {
+    console.log('Missing KV credentials. URL present:', !!kvUrl, 'Token present:', !!kvToken);
+}
 
 const kv = isKVConfigured
   ? createClient({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
+      url: kvUrl!,
+      token: kvToken!,
     })
   : null;
 
@@ -38,7 +48,6 @@ async function initDB() {
     }
   } else {
     // Local fallback
-    // Only try to write if we are NOT in a serverless environment (simple check) or just try/catch
     try {
         if (!fs.existsSync(DB_PATH)) {
         const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
@@ -61,7 +70,7 @@ export async function getTeams(): Promise<Team[]> {
   if (isKVConfigured && kv) {
     try {
       const teams = await kv.get<Team[]>('teams');
-      console.log('Fetched teams from KV:', teams ? teams.length : 0);
+      // console.log('Fetched teams from KV:', teams ? teams.length : 0);
       return teams || [];
     } catch (error) {
       console.error('Error fetching teams from KV:', error);
