@@ -8,6 +8,8 @@ const DB_PATH = path.join(process.cwd(), 'db.json');
 // Check if Vercel KV is configured
 const isKVConfigured = !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN;
 
+console.log('KV Configured:', isKVConfigured); // Debug log
+
 const kv = isKVConfigured
   ? createClient({
       url: process.env.KV_REST_API_URL!,
@@ -18,15 +20,21 @@ const kv = isKVConfigured
 // Initialize DB with 10 teams if not exists
 async function initDB() {
   if (isKVConfigured && kv) {
-    const exists = await kv.exists('teams');
-    if (!exists) {
-      const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
-        id: `team${i + 1}`,
-        name: `Team ${i + 1}`,
-        password: `busan${i + 1}`,
-        tasks: JSON.parse(JSON.stringify(INITIAL_TASKS)),
-      }));
-      await kv.set('teams', teams);
+    try {
+      const exists = await kv.exists('teams');
+      if (!exists) {
+        console.log('Initializing KV database...');
+        const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
+          id: `team${i + 1}`,
+          name: `Team ${i + 1}`,
+          password: `busan${i + 1}`,
+          tasks: JSON.parse(JSON.stringify(INITIAL_TASKS)),
+        }));
+        await kv.set('teams', teams);
+        console.log('KV database initialized.');
+      }
+    } catch (error) {
+      console.error('Error initializing KV:', error);
     }
   } else {
     // Local fallback
@@ -46,8 +54,14 @@ export async function getTeams(): Promise<Team[]> {
   await initDB();
   
   if (isKVConfigured && kv) {
-    const teams = await kv.get<Team[]>('teams');
-    return teams || [];
+    try {
+      const teams = await kv.get<Team[]>('teams');
+      console.log('Fetched teams from KV:', teams ? teams.length : 0);
+      return teams || [];
+    } catch (error) {
+      console.error('Error fetching teams from KV:', error);
+      return [];
+    }
   } else {
     // Local fallback
     if (fs.existsSync(DB_PATH)) {
@@ -71,7 +85,12 @@ export async function updateTeam(updatedTeam: Team): Promise<void> {
     teams[index] = updatedTeam;
     
     if (isKVConfigured && kv) {
-      await kv.set('teams', teams);
+      try {
+        await kv.set('teams', teams);
+        console.log(`Updated team ${updatedTeam.id} in KV`);
+      } catch (error) {
+        console.error('Error updating team in KV:', error);
+      }
     } else {
       // Local fallback
       fs.writeFileSync(DB_PATH, JSON.stringify({ teams }, null, 2));
