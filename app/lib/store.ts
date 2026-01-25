@@ -1,69 +1,55 @@
 import fs from 'fs';
 import path from 'path';
-import { createClient } from '@vercel/kv';
+import Redis from 'ioredis';
 import { Team, INITIAL_TASKS } from './definitions';
 
 const DB_PATH = path.join(process.cwd(), 'db.json');
 
-// Debug: Log all environment variable keys (not values) to see what's available
-console.log('Available Env Vars:', Object.keys(process.env).filter(key => key.startsWith('KV_') || key.startsWith('BLOB_') || key.startsWith('REDIS_')));
+// Check for Redis configuration
+const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
+const isRedisConfigured = !!redisUrl;
 
-// Check if Vercel KV is configured
-const kvUrl = process.env.KV_REST_API_URL || process.env.KV_URL || process.env.REDIS_URL;
-const kvToken = process.env.KV_REST_API_TOKEN || process.env.KV_TOKEN || process.env.REDIS_TOKEN; 
+console.log('Redis Configured:', isRedisConfigured);
 
-const isKVConfigured = !!kvUrl;
+let redis: Redis | null = null;
 
-console.log('KV Configured:', isKVConfigured); 
-if (!isKVConfigured) {
-    console.log('Missing KV credentials. URL present:', !!kvUrl);
-}
-
-let kv: any = null;
-
-if (isKVConfigured) {
+if (isRedisConfigured && redisUrl) {
     try {
-        if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-             kv = createClient({
-                url: process.env.KV_REST_API_URL,
-                token: process.env.KV_REST_API_TOKEN,
-            });
-        } 
-        else if (kvUrl) {
-             console.log('Attempting to use generic KV/Redis URL:', kvUrl.substring(0, 10) + '...');
-             
-             if (kvUrl.startsWith('redis://')) {
-                 console.warn('WARNING: Detected redis:// URL. @vercel/kv requires HTTP REST API. You might need to use "ioredis" package or check Vercel Storage settings for KV REST API details.');
-             }
-             
-             kv = createClient({
-                url: kvUrl,
-                token: kvToken || '',
-            });
-        }
+        console.log('Initializing Redis client with URL:', redisUrl.substring(0, 10) + '...');
+        // ioredis handles redis:// URLs natively
+        redis = new Redis(redisUrl);
+        
+        redis.on('error', (err) => {
+            console.error('Redis Client Error:', err);
+        });
+        
+        redis.on('connect', () => {
+            console.log('Redis Client Connected');
+        });
+
     } catch (e) {
-        console.error('Failed to create KV client:', e);
+        console.error('Failed to create Redis client:', e);
     }
 }
 
 // Initialize DB with 10 teams if not exists
 async function initDB() {
-  if (isKVConfigured && kv) {
+  if (isRedisConfigured && redis) {
     try {
-      const exists = await kv.exists('teams');
+      const exists = await redis.exists('teams');
       if (!exists) {
-        console.log('Initializing KV database...');
+        console.log('Initializing Redis database...');
         const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
           id: `team${i + 1}`,
           name: `Team ${i + 1}`,
           password: `busan${i + 1}`,
           tasks: JSON.parse(JSON.stringify(INITIAL_TASKS)),
         }));
-        await kv.set('teams', teams);
-        console.log('KV database initialized.');
+        await redis.set('teams', JSON.stringify(teams));
+        console.log('Redis database initialized.');
       }
     } catch (error) {
-      console.error('Error initializing KV:', error);
+      console.error('Error initializing Redis:', error);
     }
   } else {
     // Local fallback
@@ -86,13 +72,17 @@ async function initDB() {
 export async function getTeams(): Promise<Team[]> {
   await initDB();
   
-  if (isKVConfigured && kv) {
+  if (isRedisConfigured && redis) {
     try {
-      // Fix: kv.get might not be generic in the version installed or when typed as 'any'
-      const teams = await kv.get('teams') as Team[];
-      return teams || [];
+      const data = await redis.get('teams');
+      if (data) {
+          const teams = JSON.parse(data) as Team[];
+          // console.log('Fetched teams from Redis:', teams.length);
+          return teams;
+      }
+      return [];
     } catch (error) {
-      console.error('Error fetching teams from KV:', error);
+      console.error('Error fetching teams from Redis:', error);
       return [];
     }
   } else {
@@ -117,12 +107,12 @@ export async function updateTeam(updatedTeam: Team): Promise<void> {
   if (index !== -1) {
     teams[index] = updatedTeam;
     
-    if (isKVConfigured && kv) {
+    if (isRedisConfigured && redis) {
       try {
-        await kv.set('teams', teams);
-        console.log(`Updated team ${updatedTeam.id} in KV`);
+        await redis.set('teams', JSON.stringify(teams));
+        console.log(`Updated team ${updatedTeam.id} in Redis`);
       } catch (error) {
-        console.error('Error updating team in KV:', error);
+        console.error('Error updating team in Redis:', error);
       }
     } else {
       // Local fallback
