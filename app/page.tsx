@@ -10,8 +10,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   
   // Login State
-  const [teamId, setTeamId] = useState('team1');
-  const [password, setPassword] = useState('busan1');
+  const [teamId, setTeamId] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   // Hydrate from localStorage if available (optional, but good for refresh)
@@ -20,6 +20,12 @@ export default function Home() {
     if (storedTeam) {
       setTeam(JSON.parse(storedTeam));
     }
+
+    // Load saved login credentials
+    const savedTeamId = localStorage.getItem('busan_saved_teamId');
+    const savedPassword = localStorage.getItem('busan_saved_password');
+    if (savedTeamId) setTeamId(savedTeamId);
+    if (savedPassword) setPassword(savedPassword);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -39,6 +45,10 @@ export default function Home() {
       if (data.success) {
         setTeam(data.team);
         localStorage.setItem('busan_team', JSON.stringify(data.team));
+        
+        // Save credentials for next time
+        localStorage.setItem('busan_saved_teamId', teamId);
+        localStorage.setItem('busan_saved_password', password);
       } else {
         setError(data.message || 'Login failed');
       }
@@ -79,8 +89,12 @@ export default function Home() {
   const handleLogout = () => {
     setTeam(null);
     localStorage.removeItem('busan_team');
-    setTeamId('team1');
-    setPassword('busan1');
+    // We do NOT clear saved credentials on logout so they are there for next login
+    // If you want to clear them, uncomment the next lines:
+    // localStorage.removeItem('busan_saved_teamId');
+    // localStorage.removeItem('busan_saved_password');
+    // setTeamId('team1');
+    // setPassword('busan1');
   };
 
   const handleNameChange = async () => {
@@ -120,6 +134,7 @@ export default function Home() {
                 onChange={(e) => setTeamId(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
+                <option value="" disabled>Select a Team</option>
                 {Array.from({ length: 10 }, (_, i) => (
                   <option key={i} value={`team${i + 1}`}>Team {i + 1}</option>
                 ))}
