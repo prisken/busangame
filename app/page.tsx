@@ -1,64 +1,221 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Team, Task } from '@/app/lib/definitions';
+import TaskCard from '@/app/components/TaskCard';
+import { LogIn } from 'lucide-react';
 
 export default function Home() {
+  const [team, setTeam] = useState<Team | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Login State
+  const [teamId, setTeamId] = useState('team1');
+  const [password, setPassword] = useState('busan1');
+  const [error, setError] = useState('');
+
+  // Hydrate from localStorage if available (optional, but good for refresh)
+  useEffect(() => {
+    const storedTeam = localStorage.getItem('busan_team');
+    if (storedTeam) {
+      setTeam(JSON.parse(storedTeam));
+    }
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, password }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setTeam(data.team);
+        localStorage.setItem('busan_team', JSON.stringify(data.team));
+      } else {
+        setError(data.message || 'Login failed');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    if (!team) return;
+
+    // Optimistic update
+    const updatedTasks = team.tasks.map((t) =>
+      t.id === taskId ? { ...t, ...updates } : t
+    );
+    const updatedTeam = { ...team, tasks: updatedTasks };
+    setTeam(updatedTeam);
+    localStorage.setItem('busan_team', JSON.stringify(updatedTeam));
+
+    try {
+      await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId: team.id,
+          taskId,
+          ...updates,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to sync update', err);
+      // Revert if needed, but for now we keep optimistic state
+    }
+  };
+
+  const handleLogout = () => {
+    setTeam(null);
+    localStorage.removeItem('busan_team');
+    setTeamId('team1');
+    setPassword('busan1');
+  };
+
+  const handleNameChange = async () => {
+    if (!team) return;
+    const newName = prompt('Enter new team name:', team.name);
+    if (newName && newName !== team.name) {
+      const updatedTeam = { ...team, name: newName };
+      setTeam(updatedTeam);
+      localStorage.setItem('busan_team', JSON.stringify(updatedTeam));
+      
+      try {
+         await fetch('/api/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teamId: team.id, name: newName }),
+        });
+      } catch (err) {
+        console.error('Failed to update team name', err);
+      }
+    }
+  };
+
+  if (!team) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Busan Game 🇰🇷</h1>
+            <p className="text-gray-600 mt-2">Team Login</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Team ID</label>
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {Array.from({ length: 10 }, (_, i) => (
+                  <option key={i} value={`team${i + 1}`}>Team {i + 1}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter password"
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center items-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Logging in...' : <><LogIn size={18} /> Login</>}
+            </button>
+          </form>
+          <div className="mt-6 text-center text-xs text-gray-400">
+            Default password is "busan" + team number (e.g., busan1)
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Group tasks by category
+  const tasksByCategory = team.tasks.reduce((acc, task) => {
+    if (!acc[task.category]) acc[task.category] = [];
+    acc[task.category].push(task);
+    return acc;
+  }, {} as Record<string, Task[]>);
+
+  const completedCount = team.tasks.filter(t => t.completed).length;
+  const totalTasks = team.tasks.length;
+  const progress = (completedCount / totalTasks) * 100;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-gray-100 pb-12">
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Busan Game 🇰🇷</h1>
+            <button 
+              onClick={handleNameChange}
+              className="text-2xl font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-2"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+              {team.name}
+              <span className="text-sm font-normal text-gray-400">✎</span>
+            </button>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-600 hover:text-red-800 font-medium"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Logout
+          </button>
         </div>
+        {/* Progress Bar */}
+        <div className="h-1.5 bg-gray-200 w-full">
+          <div 
+            className="h-full bg-green-500 transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-8">
+        <div className="bg-white p-4 rounded-lg shadow-sm flex justify-between items-center">
+          <span className="font-medium text-gray-700">Progress</span>
+          <span className="font-bold text-blue-600">{completedCount} / {totalTasks} Tasks Completed</span>
+        </div>
+
+        {Object.entries(tasksByCategory).map(([category, tasks]) => (
+          <div key={category} className="space-y-4">
+            <h2 className="text-xl font-bold text-gray-800 border-l-4 border-blue-500 pl-3">{category}</h2>
+            <div className="grid gap-4">
+              {tasks.map((task) => (
+                <TaskCard key={task.id} task={task} onUpdate={handleTaskUpdate} />
+              ))}
+            </div>
+          </div>
+        ))}
       </main>
     </div>
   );

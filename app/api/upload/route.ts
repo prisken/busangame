@@ -1,0 +1,30 @@
+import { NextResponse } from 'next/server';
+import path from 'path';
+import fs from 'fs';
+import { writeFile } from 'fs/promises';
+
+export async function POST(request: Request) {
+  const formData = await request.formData();
+  const file = formData.get('file') as File;
+
+  if (!file) {
+    return NextResponse.json({ success: false, message: 'No file uploaded' }, { status: 400 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const filename = `${Date.now()}-${file.name.replaceAll(' ', '_')}`;
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+
+  // Ensure directory exists
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  try {
+    await writeFile(path.join(uploadDir, filename), buffer);
+    return NextResponse.json({ success: true, url: `/uploads/${filename}` });
+  } catch (error) {
+    console.error('Error saving file:', error);
+    return NextResponse.json({ success: false, message: 'Upload failed' }, { status: 500 });
+  }
+}
