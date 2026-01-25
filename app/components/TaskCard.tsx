@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { Info, Upload, Check, X, Trash2 } from 'lucide-react';
 import { Task } from '@/app/lib/definitions';
 import Image from 'next/image';
+import { upload } from '@vercel/blob/client';
 
 interface TaskCardProps {
   task: Task;
@@ -32,6 +33,26 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
     setUploading(true);
 
     try {
+      // Use Vercel Client Upload for Production (supports large files)
+      // We assume if we are not on localhost, we are on Vercel
+      const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+      if (isProduction) {
+          try {
+            const newBlob = await upload(file.name, file, {
+                access: 'public',
+                handleUploadUrl: '/api/upload',
+            });
+            onUpdate(task.id, { image: newBlob.url });
+            setUploading(false);
+            return;
+          } catch (err) {
+              console.error('Vercel Client Upload failed, falling back...', err);
+              // Fallback to legacy upload if client upload fails
+          }
+      }
+
+      // Legacy / Local Upload Logic
       // Check if it's an image for client-side compression
       if (file.type.startsWith('image/')) {
         const img = document.createElement('img');
