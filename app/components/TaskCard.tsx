@@ -13,6 +13,7 @@ interface TaskCardProps {
 export default function TaskCard({ task, onUpdate }: TaskCardProps) {
   const [showInfo, setShowInfo] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,44 +30,66 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 4.5MB limit check
+    if (file.size > 4.5 * 1024 * 1024) {
+        if (!file.type.startsWith('image/')) {
+             alert('Video is too large (max 4.5MB). Please record a shorter video or lower the quality.');
+             return;
+        }
+        // Images are automatically compressed below, so we let them pass
+    }
+
     setUploading(true);
+    setProgress(0);
 
     try {
-      // Reverted to standard upload logic to unblock deployment
-      // Check if it's an image for client-side compression
       if (file.type.startsWith('image/')) {
-        const img = document.createElement('img');
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-          img.src = event.target?.result as string;
-          img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 800;
-            const scaleSize = MAX_WIDTH / img.width;
-            canvas.width = MAX_WIDTH;
-            canvas.height = img.height * scaleSize;
-
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            // Convert canvas to blob
-            canvas.toBlob(async (blob) => {
-              if (blob) {
-                await uploadFile(blob, file.name);
-              }
-            }, 'image/jpeg', 0.7);
-          };
-        };
-        reader.readAsDataURL(file);
+        await compressAndUploadImage(file);
       } else {
-        // For video or other types, upload directly
+        // For videos, we upload directly. 
+        // Real client-side video compression (ffmpeg.wasm) is too heavy for this simple app.
+        // We rely on the user to upload smaller files or the 4.5MB check above.
         await uploadFile(file, file.name);
       }
     } catch (error) {
       console.error('Error processing file:', error);
+      alert('Upload failed. Please try again.');
       setUploading(false);
     }
+  };
+
+  const compressAndUploadImage = (file: File) => {
+    const img = document.createElement('img');
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      img.src = event.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200; // Reasonable size for mobile viewing
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Aggressive compression for images to ensure they fit
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            await uploadFile(blob, file.name);
+          }
+        }, 'image/jpeg', 0.6);
+      };
+    };
+    reader.readAsDataURL(file);
   };
 
   const uploadFile = async (fileBlob: Blob, fileName: string) => {
@@ -90,6 +113,7 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
       alert('Upload failed');
     } finally {
       setUploading(false);
+      setProgress(0);
     }
   };
 
