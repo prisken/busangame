@@ -21,7 +21,7 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
 
   const handleRemoveImage = () => {
     if (confirm('Are you sure you want to remove this photo/video?')) {
-        onUpdate(task.id, { image: undefined }); // Send undefined/null to trigger removal
+        onUpdate(task.id, { image: null }); 
     }
   };
 

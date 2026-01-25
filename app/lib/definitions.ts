@@ -4,7 +4,7 @@ export interface Task {
   title: string;
   description?: string; // For the "i" icon popup
   completed: boolean;
-  image?: string; // Base64 or URL
+  image?: string | null; // Base64 or URL
 }
 
 export interface Team {
