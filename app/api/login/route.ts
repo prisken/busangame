@@ -3,7 +3,7 @@ import { getTeams } from '@/app/lib/store';
 
 export async function POST(request: Request) {
   const { teamId, password } = await request.json();
-  const teams = getTeams();
+  const teams = await getTeams();
   const team = teams.find((t) => t.id === teamId && t.password === password);
 
   if (team) {

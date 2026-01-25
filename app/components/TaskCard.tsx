@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Info, Upload, Check, X } from 'lucide-react';
+import { Info, Upload, Check, X, Trash2 } from 'lucide-react';
 import { Task } from '@/app/lib/definitions';
 import Image from 'next/image';
 
@@ -17,6 +17,12 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate(task.id, { completed: e.target.checked });
+  };
+
+  const handleRemoveImage = () => {
+    if (confirm('Are you sure you want to remove this photo/video?')) {
+        onUpdate(task.id, { image: undefined }); // Send undefined/null to trigger removal
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,6 +154,17 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
                     Change
                   </button>
               </div>
+
+              <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveImage();
+                }}
+                className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-md hover:bg-red-700 transition-colors z-10 pointer-events-auto"
+                title="Remove"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ) : (
             <button
