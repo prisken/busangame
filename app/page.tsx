@@ -166,9 +166,6 @@ export default function Home() {
               {loading ? 'Logging in...' : <><LogIn size={18} /> Login</>}
             </button>
           </form>
-          <div className="mt-6 text-center text-xs text-gray-400">
-            Default password is "busan" + team number (e.g., busan1)
-          </div>
         </div>
       </div>
     );
