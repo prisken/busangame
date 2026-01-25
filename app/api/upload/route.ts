@@ -73,3 +73,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: 'Upload failed' }, { status: 500 });
   }
 }
+// Force rebuild
