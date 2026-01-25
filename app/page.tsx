@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Team, Task } from '@/app/lib/definitions';
 import TaskCard from '@/app/components/TaskCard';
-import { LogIn } from 'lucide-react';
+import { LogIn, Trophy } from 'lucide-react';
 
 export default function Home() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -66,12 +66,17 @@ export default function Home() {
     const updatedTasks = team.tasks.map((t) =>
       t.id === taskId ? { ...t, ...updates } : t
     );
-    const updatedTeam = { ...team, tasks: updatedTasks };
+    
+    // Check if all tasks are now completed (optimistically)
+    const allCompleted = updatedTasks.every(t => t.completed);
+    const completedAt = allCompleted && !team.completedAt ? new Date().toISOString() : (allCompleted ? team.completedAt : null);
+
+    const updatedTeam = { ...team, tasks: updatedTasks, completedAt };
     setTeam(updatedTeam);
     localStorage.setItem('busan_team', JSON.stringify(updatedTeam));
 
     try {
-      await fetch('/api/tasks', {
+      const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,6 +85,14 @@ export default function Home() {
           ...updates,
         }),
       });
+      
+      // Update with server response to ensure timestamp is synced correctly
+      const data = await res.json();
+      if (data.success) {
+          setTeam(data.team);
+          localStorage.setItem('busan_team', JSON.stringify(data.team));
+      }
+
     } catch (err) {
       console.error('Failed to sync update', err);
       // Revert if needed, but for now we keep optimistic state
@@ -89,12 +102,6 @@ export default function Home() {
   const handleLogout = () => {
     setTeam(null);
     localStorage.removeItem('busan_team');
-    // We do NOT clear saved credentials on logout so they are there for next login
-    // If you want to clear them, uncomment the next lines:
-    // localStorage.removeItem('busan_saved_teamId');
-    // localStorage.removeItem('busan_saved_password');
-    // setTeamId('team1');
-    // setPassword('busan1');
   };
 
   const handleNameChange = async () => {
@@ -217,6 +224,16 @@ export default function Home() {
           <span className="font-medium text-gray-700">Progress</span>
           <span className="font-bold text-blue-600">{completedCount} / {totalTasks} Tasks Completed</span>
         </div>
+
+        {team.completedAt && (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg flex items-center gap-3 text-yellow-800 animate-in fade-in zoom-in">
+                <Trophy className="text-yellow-600" size={24} />
+                <div>
+                    <p className="font-bold">All Tasks Completed!</p>
+                    <p className="text-sm">Finished at: {new Date(team.completedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}</p>
+                </div>
+            </div>
+        )}
 
         {Object.entries(tasksByCategory).map(([category, tasks]) => (
           <div key={category} className="space-y-4">

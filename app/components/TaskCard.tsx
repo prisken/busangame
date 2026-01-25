@@ -13,16 +13,21 @@ interface TaskCardProps {
 export default function TaskCard({ task, onUpdate }: TaskCardProps) {
   const [showInfo, setShowInfo] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Prevent checking if no image is uploaded
+    if (e.target.checked && !task.image) {
+        alert('Please upload a photo or video before marking the task as complete.');
+        return;
+    }
     onUpdate(task.id, { completed: e.target.checked });
   };
 
   const handleRemoveImage = () => {
     if (confirm('Are you sure you want to remove this photo/video?')) {
-        onUpdate(task.id, { image: null }); 
+        // If removing image, also uncheck the task
+        onUpdate(task.id, { image: null, completed: false }); 
     }
   };
 
@@ -40,56 +45,50 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
     }
 
     setUploading(true);
-    setProgress(0);
 
     try {
+      // Reverted to standard upload logic to unblock deployment
+      // Check if it's an image for client-side compression
       if (file.type.startsWith('image/')) {
-        await compressAndUploadImage(file);
+        const img = document.createElement('img');
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+          img.src = event.target?.result as string;
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200; // Reasonable size for mobile viewing
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+
+            // Aggressive compression for images to ensure they fit
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                await uploadFile(blob, file.name);
+              }
+            }, 'image/jpeg', 0.6);
+          };
+        };
+        reader.readAsDataURL(file);
       } else {
-        // For videos, we upload directly. 
-        // Real client-side video compression (ffmpeg.wasm) is too heavy for this simple app.
-        // We rely on the user to upload smaller files or the 4.5MB check above.
+        // For video or other types, upload directly
         await uploadFile(file, file.name);
       }
     } catch (error) {
       console.error('Error processing file:', error);
-      alert('Upload failed. Please try again.');
       setUploading(false);
     }
-  };
-
-  const compressAndUploadImage = (file: File) => {
-    const img = document.createElement('img');
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      img.src = event.target?.result as string;
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200; // Reasonable size for mobile viewing
-        let width = img.width;
-        let height = img.height;
-
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Aggressive compression for images to ensure they fit
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            await uploadFile(blob, file.name);
-          }
-        }, 'image/jpeg', 0.6);
-      };
-    };
-    reader.readAsDataURL(file);
   };
 
   const uploadFile = async (fileBlob: Blob, fileName: string) => {
@@ -104,7 +103,8 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
       const data = await res.json();
 
       if (data.success) {
-        onUpdate(task.id, { image: data.url });
+        // Automatically check the box when upload succeeds
+        onUpdate(task.id, { image: data.url, completed: true });
       } else {
         alert('Upload failed: ' + data.message);
       }
@@ -113,7 +113,6 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
       alert('Upload failed');
     } finally {
       setUploading(false);
-      setProgress(0);
     }
   };
 
@@ -131,7 +130,7 @@ export default function TaskCard({ task, onUpdate }: TaskCardProps) {
             type="checkbox"
             checked={task.completed}
             onChange={handleCheckboxChange}
-            className="w-6 h-6 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+            className={`w-6 h-6 rounded focus:ring-blue-500 cursor-pointer ${!task.image ? 'opacity-50 cursor-not-allowed' : 'text-blue-600'}`}
           />
           <h3 className={`font-semibold text-lg ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}>
             {task.title}

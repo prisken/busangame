@@ -79,6 +79,15 @@ export async function POST(request: Request) {
     }
   }
 
+  // Check if all tasks are completed to set timestamp
+  const allCompleted = team.tasks.every(t => t.completed);
+  if (allCompleted && !team.completedAt) {
+      team.completedAt = new Date().toISOString();
+  } else if (!allCompleted) {
+      // If they uncheck a task, clear the timestamp
+      team.completedAt = null;
+  }
+
   await updateTeam(team);
 
   return NextResponse.json({ success: true, team });

@@ -12,6 +12,7 @@ export interface Team {
   name: string;
   password: string; // Simple password
   tasks: Task[];
+  completedAt?: string | null; // ISO timestamp when all tasks were completed
 }
 
 export const INITIAL_TASKS: Task[] = [
