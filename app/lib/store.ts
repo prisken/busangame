@@ -38,14 +38,19 @@ async function initDB() {
     }
   } else {
     // Local fallback
-    if (!fs.existsSync(DB_PATH)) {
-      const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
-        id: `team${i + 1}`,
-        name: `Team ${i + 1}`,
-        password: `busan${i + 1}`,
-        tasks: JSON.parse(JSON.stringify(INITIAL_TASKS)),
-      }));
-      fs.writeFileSync(DB_PATH, JSON.stringify({ teams }, null, 2));
+    // Only try to write if we are NOT in a serverless environment (simple check) or just try/catch
+    try {
+        if (!fs.existsSync(DB_PATH)) {
+        const teams: Team[] = Array.from({ length: 10 }, (_, i) => ({
+            id: `team${i + 1}`,
+            name: `Team ${i + 1}`,
+            password: `busan${i + 1}`,
+            tasks: JSON.parse(JSON.stringify(INITIAL_TASKS)),
+        }));
+        fs.writeFileSync(DB_PATH, JSON.stringify({ teams }, null, 2));
+        }
+    } catch (err) {
+        console.warn('Could not write to local DB (init):', err);
     }
   }
 }
@@ -93,7 +98,11 @@ export async function updateTeam(updatedTeam: Team): Promise<void> {
       }
     } else {
       // Local fallback
-      fs.writeFileSync(DB_PATH, JSON.stringify({ teams }, null, 2));
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify({ teams }, null, 2));
+      } catch (err) {
+        console.error('Failed to write to local DB (likely read-only fs):', err);
+      }
     }
   }
 }
