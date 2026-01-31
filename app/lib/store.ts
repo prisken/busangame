@@ -69,6 +69,26 @@ async function initDB() {
   }
 }
 
+// Helper to merge stored tasks with latest definitions
+function mergeTasksWithDefinitions(teams: Team[]): Team[] {
+  return teams.map(team => {
+    const updatedTasks = team.tasks.map(task => {
+      const definition = INITIAL_TASKS.find(t => t.id === task.id);
+      if (definition) {
+        // Update title and description from definition, keep other state
+        return {
+          ...task,
+          category: definition.category,
+          title: definition.title,
+          description: definition.description,
+        };
+      }
+      return task;
+    });
+    return { ...team, tasks: updatedTasks };
+  });
+}
+
 export async function getTeams(): Promise<Team[]> {
   await initDB();
   
@@ -76,8 +96,9 @@ export async function getTeams(): Promise<Team[]> {
     try {
       const data = await redis.get('teams');
       if (data) {
-          const teams = JSON.parse(data) as Team[];
-          // console.log('Fetched teams from Redis:', teams.length);
+          let teams = JSON.parse(data) as Team[];
+          // Merge with latest definitions to ensure text updates are reflected
+          teams = mergeTasksWithDefinitions(teams);
           return teams;
       }
       return [];
@@ -89,7 +110,10 @@ export async function getTeams(): Promise<Team[]> {
     // Local fallback
     if (fs.existsSync(DB_PATH)) {
       const data = fs.readFileSync(DB_PATH, 'utf-8');
-      return JSON.parse(data).teams;
+      let teams = JSON.parse(data).teams;
+      // Merge with latest definitions
+      teams = mergeTasksWithDefinitions(teams);
+      return teams;
     }
     return [];
   }
