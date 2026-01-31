@@ -83,7 +83,7 @@ export const INITIAL_TASKS: Task[] = [
     id: 'g2',
     category: '🎮 傳統遊戲挑戰',
     title: '搵三個當地人玩包剪揼並勝出',
-    description: '搵三個釜山當地人玩包剪揼，用韓文講出「包、剪、揼」並勝出，拍下影片作證',
+    description: '搵三個釜山當地人同一時間玩包剪揼，用韓文講出「包、剪、揼」並勝出，拍下影片作證',
     completed: false,
   },
 ];
